@@ -28,7 +28,7 @@ async function run() {
     // get all food items from the database
     app.get("/allFood", async (req, res) => {
       const cursor = foodCollection.find();
-      const result = await cursor.toArray();
+      const result = await cursor.sort({ quantity: -1 }).limit(6).toArray();
       res.send(result);
     });
 
