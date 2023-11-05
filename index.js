@@ -25,10 +25,16 @@ async function run() {
   try {
     const foodCollection = client.db("Donation").collection("allFood");
 
+    // get limit food items from the database
+    app.get("/allFood/limited", async (req, res) => {
+      const cursor = foodCollection.find();
+      const result = await cursor.sort({ quantity: -1 }).limit(6).toArray();
+      res.send(result);
+    });
     // get all food items from the database
     app.get("/allFood", async (req, res) => {
       const cursor = foodCollection.find();
-      const result = await cursor.sort({ quantity: -1 }).limit(6).toArray();
+      const result = await cursor.toArray();
       res.send(result);
     });
 
