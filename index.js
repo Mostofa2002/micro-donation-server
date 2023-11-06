@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 require("dotenv").config();
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const port = process.env.PORT || 5000;
 
@@ -33,11 +33,27 @@ async function run() {
     });
     // get all food items from the database
     app.get("/allFood", async (req, res) => {
-      const cursor = foodCollection.find();
+      const sort = req.query.sort;
+      const search = req.query.search;
+      console.log(search);
+
+      const query = { food_name: { $regex: search, $options: "i" } };
+
+      const options = {
+        sort: { expiration_date: sort === "asc" ? 1 : -1 },
+      };
+      const cursor = foodCollection.find(query, options);
       const result = await cursor.toArray();
       res.send(result);
     });
+    // get single food from database
+    app.get("/singleFood/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
 
+      const result = await foodCollection.findOne(query);
+      res.send(result);
+    });
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
     // Send a ping to confirm a successful connection
