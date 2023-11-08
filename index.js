@@ -1,15 +1,18 @@
 const express = require("express");
 const cors = require("cors");
 const app = express();
+const jwt = require("jsonwebtoken");
+const cookie_Parser = require("cookie-parser");
+
 require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors());
+app.use(cors({ origin: ["http://localhost:5174"], credentials: true }));
 app.use(express.json());
-
+app.use(cookie_Parser());
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.0jbjnlh.mongodb.net/?retryWrites=true&w=majority`;
 
 // Create a MongoClient with a MongoClientOptions object to set the Stable API version
@@ -20,11 +23,58 @@ const client = new MongoClient(uri, {
     deprecationErrors: true,
   },
 });
+// jwt gateman
+const gateman = (req, res, next) => {
+  const token = req?.cookies?.token;
+  // console.log("value of token", token);
+  if (!token) {
+    return res.status(401).send({
+      message: "Unauthorized access token",
+    });
+  }
+
+  jwt.verify(token, process.env.ACCESS_TOKEN, (err, decoded) => {
+    // err
+    if (err) {
+      console.log(err);
+      return res.status(401).send({
+        message: "Unauthorized access token",
+      });
+    }
+    // console.log("code is cracked", decoded);
+    req.user = decoded;
+
+    next();
+  });
+};
 
 async function run() {
   try {
     const foodCollection = client.db("Donation").collection("allFood");
     const requestCollection = client.db("Donation").collection("request");
+
+    // jwt process here
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      console.log("user from client", user);
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN, {
+        expiresIn: "1h",
+      });
+      res
+        .cookie("token", token, {
+          httpOnly: true,
+          secure: true,
+          sameSite: "none",
+        })
+        .send({ success: true });
+    });
+    // logOut then removed the token
+
+    app.post("/logout", async (req, res) => {
+      const user = req.body;
+      console.log("logout from client", user);
+      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+    });
 
     // get limit food items from the database
     app.get("/allFood/limited", async (req, res) => {
@@ -112,7 +162,7 @@ async function run() {
     });
 
     // food that request user
-    app.get("/request/:foodId", async (req, res) => {
+    app.get("/request/:foodId", gateman, async (req, res) => {
       try {
         const { foodId } = req.params;
         const result = await requestCollection
@@ -125,8 +175,13 @@ async function run() {
     });
 
     // my request food also jwt here
-    app.get("/requests", async (req, res) => {
+    app.get("/requests", gateman, async (req, res) => {
       try {
+        if (req.user.email !== req.query.email) {
+          return res.status(403).send({
+            message: "forbidden access",
+          });
+        }
         let query = {};
         if (req.query?.email) {
           query = {
@@ -141,11 +196,17 @@ async function run() {
       }
     });
 
-    app.get("/Food", async (req, res) => {
-      // also jwt used here
+    // also jwt used here
+    app.get("/Food", gateman, async (req, res) => {
       try {
+        // console.log(req.query.email);
+        // console.log("token owner", req.user);
+        if (req.user.email !== req.query.email) {
+          return res.status(403).send({
+            message: "forbidden access",
+          });
+        }
         let query = {};
-
         if (req.query?.email) {
           query = {
             donatorEmail: req.query.email,
@@ -157,10 +218,19 @@ async function run() {
         console.log(error);
       }
     });
+
+    // delete
     app.delete("/allFoodS/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const result = await foodCollection.deleteOne(query);
+      res.send(result);
+    });
+
+    app.delete("/request/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await requestCollection.deleteOne(query);
       res.send(result);
     });
 
@@ -172,6 +242,46 @@ async function run() {
       const result = await foodCollection.findOne(query);
       res.send(result);
     });
+
+    app.put("/update/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      // console.log("query", query);
+      const options = { upsert: true };
+      const Updated = req.body;
+      const updateDoc = {
+        $set: {
+          food_name: Updated.food_name,
+          additional_notes: Updated.additional_notes,
+          location: Updated.location,
+          image: Updated.image,
+          quantity: Updated.quantity,
+          expiration_date: Updated.expiration_date,
+          status: Updated.status,
+        },
+      };
+      const result = await foodCollection.updateOne(query, updateDoc, options);
+      res.send(result);
+    });
+
+    // small delivered patch
+    // app.patch("/updateSky/:id", async (req, res) => {
+    //   try {
+    //     const id = req.params.id;
+    //     const query = { _id: new ObjectId(id) };
+
+    //     const updateDoc = {
+    //       $set: {
+    //         status: "Delivered",
+    //       },
+    //     };
+    //     const result = await foodCollection.updateOne(query, updateDoc);
+    //     res.send(result);
+    //   } catch (error) {
+    //     console.log(error);
+    //   }
+    // });
+
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
     // Send a ping to confirm a successful connection
