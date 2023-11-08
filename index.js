@@ -10,7 +10,16 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const port = process.env.PORT || 5000;
 
 // middleware
-app.use(cors({ origin: ["http://localhost:5174"], credentials: true }));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5174",
+      "https://micro-donation-40d62.firebaseapp.com",
+      "https://micro-donation-40d62.web.app",
+    ],
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookie_Parser());
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.0jbjnlh.mongodb.net/?retryWrites=true&w=majority`;
