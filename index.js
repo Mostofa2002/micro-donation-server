@@ -13,7 +13,7 @@ const port = process.env.PORT || 5000;
 app.use(
   cors({
     origin: [
-      "http://localhost:5174",
+      "http://localhost:5173",
       "https://micro-donation-40d62.firebaseapp.com",
       "https://micro-donation-40d62.web.app",
     ],
