@@ -82,7 +82,13 @@ async function run() {
     app.post("/logout", async (req, res) => {
       const user = req.body;
       console.log("logout from client", user);
-      res.clearCookie("token", { maxAge: 0 }).send({ success: true });
+      res
+        .clearCookie("token", {
+          maxAge: 0,
+          secure: process.env.NODE_ENV === "production" ? true : false,
+          sameSite: process.env.NODE_ENV === "production" ? "none" : "strict",
+        })
+        .send({ success: true });
     });
 
     // get limit food items from the database
@@ -274,22 +280,26 @@ async function run() {
     });
 
     // small delivered patch
-    // app.patch("/updateSky/:id", async (req, res) => {
-    //   try {
-    //     const id = req.params.id;
-    //     const query = { _id: new ObjectId(id) };
 
-    //     const updateDoc = {
-    //       $set: {
-    //         status: "Delivered",
-    //       },
-    //     };
-    //     const result = await foodCollection.updateOne(query, updateDoc);
-    //     res.send(result);
-    //   } catch (error) {
-    //     console.log(error);
-    //   }
-    // });
+    app.patch("/updated/:id", async (req, res) => {
+      try {
+        const id = req.params.id;
+        const data = req.body;
+        console.log(data);
+        const query = { _id: new ObjectId(id) };
+
+        const updateDoc = {
+          $set: {
+            status: data.status,
+          },
+        };
+        const result = await requestCollection.updateOne(query, updateDoc);
+        console.log(result);
+        res.send(result);
+      } catch (error) {
+        console.log(error);
+      }
+    });
 
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
